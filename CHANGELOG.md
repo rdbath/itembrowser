@@ -1,5 +1,9 @@
 ##  Changelog
 
+#### Version 2.6 08.02.2019
+
+* Support for QGIS3
+
 #### Version 2.5 04.02.2015
 
 * Allow transparency for rubber band

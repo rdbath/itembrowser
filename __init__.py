@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 #-----------------------------------------------------------
 #
 # Item Browser is a QGIS plugin which allows you to browse a multiple selection.
@@ -27,5 +28,5 @@
 
 
 def classFactory(iface):
-    from itembrowser import itemBrowser
+    from .itembrowser import itemBrowser
     return itemBrowser(iface)

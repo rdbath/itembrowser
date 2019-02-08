@@ -1,3 +1,4 @@
+from __future__ import print_function
 #-----------------------------------------------------------
 #
 # Item Browser is a QGIS plugin which allows you to browse a multiple selection.
@@ -25,9 +26,11 @@
 #
 #---------------------------------------------------------------------
 
-from PyQt4.QtCore import SIGNAL, pyqtSlot, pyqtSignal, Qt
-from PyQt4.QtGui import QDockWidget, QIcon, QAction
-from qgis.core import QgsPoint, QgsRectangle, QgsFeatureRequest, QgsFeature, QgsExpression
+from builtins import range
+from qgis.PyQt.QtCore import pyqtSlot, pyqtSignal, Qt
+from qgis.PyQt.QtWidgets import QDockWidget, QAction
+from qgis.PyQt.QtGui import QIcon
+from qgis.core import QgsPoint, QgsRectangle, QgsFeatureRequest, QgsFeature, QgsExpression, QgsExpressionContext, QgsExpressionContextScope, QgsPointXY
 from qgis.gui import QgsRubberBand
 
 from ..core.mysettings import MySettings
@@ -40,13 +43,13 @@ class ItemBrowserDock(QDockWidget, Ui_itembrowser):
     def __init__(self, iface, layer, currentFeature):
         self.iface = iface
         self.layer = layer
-        self.renderer = self.iface.mapCanvas().mapRenderer()
+        self.renderer = self.iface.mapCanvas().mapSettings()
         self.settings = MySettings()
         QDockWidget.__init__(self)
         self.setupUi(self)
 
         self.setWindowTitle("ItemBrowser: %s" % layer.name())
-        if layer.hasGeometryType() is False:
+        if layer.isSpatial() is False:
             self.panCheck.setChecked(False)
             self.panCheck.setEnabled(False)
             self.scaleCheck.setChecked(False)
@@ -61,16 +64,16 @@ class ItemBrowserDock(QDockWidget, Ui_itembrowser):
         icon = QIcon(":/plugins/itembrowser/icons/action.svg")
         self.actionButton.setIcon(icon)
         self.attrAction = layer.actions()
-        actions = [self.attrAction[i] for i in range(self.attrAction.size())]
+        actions = [self.attrAction.actions()[i] for i in range(len(self.attrAction.actions()))]
         preferredAction = layer.customProperty("ItemBrowserPreferedAction", "")
         if preferredAction not in actions:
-            dfltAction = self.attrAction.defaultAction()
-            if dfltAction > len(actions):
-                preferredAction = self.attrAction[dfltAction].name()
+            dfltAction = self.attrAction.defaultAction("Layer")
+            if dfltAction:
+                preferredAction = dfltAction.name()
         preferredActionFound = False
         for i, action in enumerate(actions):
             qAction = QAction(QIcon(":/plugins/itembrowser/icons/action.svg"), action.name(), self)
-            qAction.triggered.connect(lambda: self.doAction(i))
+            qAction.triggered.connect(lambda checked, uid=action.id(),i=i: self.doAction(uid,i))
             self.actionButton.addAction(qAction)
             if action.name() == preferredAction:
                 self.actionButton.setDefaultAction(qAction)
@@ -86,13 +89,13 @@ class ItemBrowserDock(QDockWidget, Ui_itembrowser):
             self.on_listCombo_currentIndexChanged(currentFeature)
         else:
             self.listCombo.setCurrentIndex(currentFeature)
-        self.layer.layerDeleted.connect(self.close)
+        self.layer.destroyed.connect(self.close)
         self.layer.selectionChanged.connect(self.selectionChanged)
 
     def closeEvent(self, e):
         self.rubber.reset()
         try:
-            self.layer.layerDeleted.disconnect(self.close)
+            self.layer.destroyed.disconnect(self.close)
         except TypeError:
             pass
         try:
@@ -109,19 +112,26 @@ class ItemBrowserDock(QDockWidget, Ui_itembrowser):
         nItems = self.layer.selectedFeatureCount()
         if nItems < 2:
             self.close()
-            self.layer.emit(SIGNAL("browserNoItem()"))
+            #self.layer.emit(SIGNAL("browserNoItem()"))
             return
         self.browseFrame.setEnabled(True)
-        subset = self.layer.selectedFeaturesIds()
+        subset = self.layer.selectedFeatureIds()
         if self.settings.value("saveSelectionInProject"):
             self.layer.setCustomProperty("itemBrowserSelection", repr(subset))
 
         f = QgsFeature()
         title = QgsExpression(self.layer.displayExpression())
-        title.prepare(self.layer.pendingFields())
+        # fix_print_with_import
+        #print(self.layer.displayExpression())
+        context = QgsExpressionContext()
+        scope = QgsExpressionContextScope()
+        context.appendScope(scope)
+        title.prepare(context)
+        #title.prepare(self.layer.fields())
         iterator = self.layer.getFeatures(QgsFeatureRequest().setFilterFids(subset))
         while iterator.nextFeature(f):
-            result = title.evaluate(f)
+            scope.setFeature(f)
+            result = title.evaluate(context)
             if title.hasEvalError():
                 self.listCombo.addItem("%u" % f.id(), f.id())
             else:
@@ -138,10 +148,11 @@ class ItemBrowserDock(QDockWidget, Ui_itembrowser):
         # if scaling and bobo has width and height (i.e. not a point)
         if self.scaleCheck.isChecked() and featBobo.width() != 0 and featBobo.height() != 0:
             featBobo.scale(self.settings.value("scale"))
-            ul = self.renderer.layerToMapCoordinates(self.layer, QgsPoint(featBobo.xMinimum(), featBobo.yMaximum()))
-            ur = self.renderer.layerToMapCoordinates(self.layer, QgsPoint(featBobo.xMaximum(), featBobo.yMaximum()))
-            ll = self.renderer.layerToMapCoordinates(self.layer, QgsPoint(featBobo.xMinimum(), featBobo.yMinimum()))
-            lr = self.renderer.layerToMapCoordinates(self.layer, QgsPoint(featBobo.xMaximum(), featBobo.yMinimum()))
+
+            ul = self.renderer.layerToMapCoordinates(self.layer, QgsPointXY(featBobo.xMinimum(), featBobo.yMaximum()))
+            ur = self.renderer.layerToMapCoordinates(self.layer, QgsPointXY(featBobo.xMaximum(), featBobo.yMaximum()))
+            ll = self.renderer.layerToMapCoordinates(self.layer, QgsPointXY(featBobo.xMinimum(), featBobo.yMinimum()))
+            lr = self.renderer.layerToMapCoordinates(self.layer, QgsPointXY(featBobo.xMaximum(), featBobo.yMinimum()))
             x = (ul.x(), ur.x(), ll.x(), lr.x())
             y = (ul.y(), ur.y(), ll.y(), lr.y())
             x0 = min(x)
@@ -174,11 +185,11 @@ class ItemBrowserDock(QDockWidget, Ui_itembrowser):
         idx = self.listCombo.findText("%u" % featureId)
         self.listCombo.setCurrentIndex(idx)
 
-    def doAction(self, i):
+    def doAction(self,uid,i):
         f = self.getCurrentItem()
         self.actionButton.setDefaultAction(self.actionButton.actions()[i])
-        self.layer.setCustomProperty("ItemBrowserPreferedAction", self.attrAction[i].name())
-        self.attrAction.doActionFeature(i, f)
+        self.layer.setCustomProperty("ItemBrowserPreferedAction", self.attrAction.actions()[i].name())
+        self.attrAction.doActionFeature(uid, f, 0)
 
     @pyqtSlot(name="on_previousButton_clicked")
     def previousFeaature(self):
@@ -217,7 +228,7 @@ class ItemBrowserDock(QDockWidget, Ui_itembrowser):
         # Update browser
         self.currentPosLabel.setText("%u/%u" % (i+1, self.listCombo.count()))
         # emit signal
-        self.layer.emit(SIGNAL("browserCurrentItem(long)"), feature.id())
+        #self.layer.emit(SIGNAL("browserCurrentItem(long)"), feature.id())
           
     @pyqtSlot(int, name="on_panCheck_stateChanged")
     def on_panCheck_stateChanged(self, i):

@@ -1,3 +1,5 @@
+from __future__ import print_function
+from __future__ import absolute_import
 #-----------------------------------------------------------
 #
 # Item Browser is a QGIS plugin which allows you to browse a multiple selection.
@@ -25,18 +27,20 @@
 #
 #---------------------------------------------------------------------
 
-from PyQt4.QtCore import QUrl, Qt
-from PyQt4.QtGui import QAction, QIcon, QDesktopServices
+from builtins import object
+from qgis.PyQt.QtCore import QUrl, Qt
+from qgis.PyQt.QtWidgets import QAction
+from qgis.PyQt.QtGui import QIcon, QDesktopServices
 from qgis.core import QgsMapLayer, QgsProject
 
-from core.mysettings import MySettings
-from gui.mysettingsdialog import MySettingsDialog
-from gui.itembrowserdock import ItemBrowserDock
+from .core.mysettings import MySettings
+from .gui.mysettingsdialog import MySettingsDialog
+from .gui.itembrowserdock import ItemBrowserDock
 
-import resources
+from . import resources
 
 
-class itemBrowser():
+class itemBrowser(object):
     def __init__(self, iface):
         self.iface = iface
         self.settings = MySettings()
@@ -47,7 +51,7 @@ class itemBrowser():
         self.browserAction = QAction(QIcon(":/plugins/itembrowser/icons/itembrowser.svg"),
                                      "Browse selected items of current layer", self.iface.mainWindow())
         self.browserAction.setEnabled(False)
-        self.browserAction.triggered.connect(lambda(x): self.openBrowserDock())  # prevent passing "False" to the method
+        self.browserAction.triggered.connect(lambda x: self.openBrowserDock())  # prevent passing "False" to the method
         self.iface.addToolBarIcon(self.browserAction)
         self.iface.addPluginToMenu("&Item Browser", self.browserAction)
         # settings
@@ -67,6 +71,9 @@ class itemBrowser():
         self.currentLayerChanged(self.iface.activeLayer())
               
     def unload(self):
+        self.iface.currentLayerChanged.disconnect(self.currentLayerChanged)
+        self.iface.mapCanvas().selectionChanged.disconnect(self.currentLayerChanged)
+        QgsProject.instance().readProject.disconnect(self.reloadSession)
         self.iface.removePluginMenu("&Item Browser", self.browserAction)
         self.iface.removePluginMenu("&Item Browser", self.uisettingsAction)
         self.iface.removePluginMenu("&Item Browser", self.helpAction)
@@ -75,13 +82,13 @@ class itemBrowser():
     def currentLayerChanged(self, layer):
         enable = (layer is not None
                   and layer.type() == QgsMapLayer.VectorLayer
-                  and layer.hasGeometryType()
-                  and len(layer.selectedFeaturesIds()) > 1)
+                  and layer.isSpatial()
+                  and len(layer.selectedFeatureIds()) > 1)
         self.browserAction.setEnabled(enable)
 
     def openBrowserDock(self, layer=None, currentFeature=0):
         if layer is None:
-            layer = self.iface.legendInterface().currentLayer()
+            layer = self.iface.mapCanvas().currentLayer()
         if layer is None:
             return
         if layer.id() in self.docks:
@@ -99,14 +106,16 @@ class itemBrowser():
         del self.docks[layerid]
 
     def reloadSession(self):
+        # fix_print_with_import
+        #print("item browser reloaded")
         if not self.settings.value("saveSelectionInProject"):
             return
-        for layer in self.iface.legendInterface().layers():
+        for layer in self.iface.mapCanvas().layers():
             exec("selection = %s" % layer.customProperty("itemBrowserSelection", "[]"))
             if len(selection) > 0:
-                currentFeature = long(layer.customProperty("itemBrowserCurrentItem", 0))
+                currentFeature = int(layer.customProperty("itemBrowserCurrentItem", 0))
                 layer.setSelectedFeatures(selection)
-                if len(layer.selectedFeaturesIds()) < 1:
+                if len(layer.selectedFeatureIds()) < 1:
                     return
                 if layer.id() in self.docks:
                     self.docks[layer.id()].setCurrentItem(currentFeature)

@@ -25,9 +25,9 @@
 #
 #---------------------------------------------------------------------
 
-from PyQt4.QtGui import QDialog
+from qgis.PyQt.QtWidgets import QDialog
 
-from ..qgissettingmanager import SettingDialog
+from ..qgissettingmanager import SettingDialog, UpdateMode
 
 from ..core.mysettings import MySettings
 
@@ -37,6 +37,7 @@ from ..ui.ui_settings import Ui_Settings
 class MySettingsDialog(QDialog, Ui_Settings, SettingDialog):
     def __init__(self):
         QDialog.__init__(self)
-        self.setupUi(self)
         self.settings = MySettings()
-        SettingDialog.__init__(self, self.settings)
+        SettingDialog.__init__(self, setting_manager=self.settings, mode=UpdateMode.DialogAccept)
+        self.setupUi(self)
+        self.init_widgets()

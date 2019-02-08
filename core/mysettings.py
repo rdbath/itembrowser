@@ -25,8 +25,8 @@
 #
 #---------------------------------------------------------------------
 
-from PyQt4.QtGui import QColor
-from ..qgissettingmanager import SettingManager
+from qgis.PyQt.QtGui import QColor
+from ..qgissettingmanager import SettingManager, Scope, Bool, String, Stringlist, Integer, Double, Color, Enum
 
 pluginName = "itembrowser"
 
@@ -36,9 +36,9 @@ class MySettings(SettingManager):
         SettingManager.__init__(self, pluginName)
 
         # global settings
-        self.addSetting("dockArea", "integer", "global", 0)  # 0: right, 1: left
-        self.addSetting("saveSelectionInProject", "bool", "global", True)
-        self.addSetting("scale", "integer", "global", 4)
-        self.addSetting("rubberWidth", "double", "global", 2)
-        self.addSetting("rubberColor", "color", "global", QColor(255, 0, 0, 150), options={'allowAlpha': True})
+        self.add_setting(Integer("dockArea", Scope.Global, 0))  # 0: right, 1: left
+        self.add_setting(Bool("saveSelectionInProject", Scope.Global, True))
+        self.add_setting(Integer("scale", Scope.Global, 4))
+        self.add_setting(Double("rubberWidth", Scope.Global, 2))
+        self.add_setting(Color("rubberColor", Scope.Global, QColor(255, 0, 0, 150), True))
 
