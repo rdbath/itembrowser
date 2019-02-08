@@ -1,8 +1,8 @@
 tmp/
 .idea
 *.qgs
-ui_*.py
-resources.py
+#ui_*.py
+#resources.py
 *.qm
 *.zip
 *.bak
