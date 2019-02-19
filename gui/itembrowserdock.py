@@ -89,13 +89,13 @@ class ItemBrowserDock(QDockWidget, Ui_itembrowser):
             self.on_listCombo_currentIndexChanged(currentFeature)
         else:
             self.listCombo.setCurrentIndex(currentFeature)
-        self.layer.destroyed.connect(self.close)
+        self.layer.willBeDeleted.connect(self.close)
         self.layer.selectionChanged.connect(self.selectionChanged)
 
     def closeEvent(self, e):
         self.rubber.reset()
         try:
-            self.layer.destroyed.disconnect(self.close)
+            self.layer.willBeDeleted.disconnect(self.close)
         except TypeError:
             pass
         try:
